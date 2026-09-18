@@ -6,11 +6,19 @@ export function formatVnd(value: number) {
   }).format(value);
 }
 
-export function formatDate(value: number) {
+export function formatDate(value: number | string | Date) {
+  const date = value instanceof Date
+    ? value
+    : typeof value === 'number'
+      ? new Date(value)
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) return '—';
+
   return new Intl.DateTimeFormat('vi-VN', {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(new Date(value));
+  }).format(date);
 }
 
 export function slugify(input: string) {
