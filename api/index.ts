@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import { createVercelRouterHandler, resolveApiPath, type VercelRouteHandler, type VercelRouteMap, type VercelRouteMatch } from '@/lib/vercel-handler';
 
 import * as adminDeposits from '@/server/routes/admin/deposits';
@@ -98,7 +99,7 @@ const routes: Array<{ match: (segments: string[]) => Record<string, string> | nu
   { match: exact('webhook', 'sepay'), routes: adapt(webhookSepay) },
 ];
 
-function resolveRoute(request: { url?: string | null }): VercelRouteMatch | null {
+function resolveRoute(request: IncomingMessage): VercelRouteMatch | null {
   let pathname = resolveApiPath(request).replace(/\/+$/, '') || '/';
 
   // Vercel can expose req.url either with the /api prefix or relative to the
