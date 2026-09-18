@@ -45,7 +45,7 @@ function adapt(module: RouteModule): VercelRouteMap {
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'] as const) {
     const handler = module[method];
     if (handler) {
-      routes[method] = ((request: Request, context) => handler(request, { params: context.params })) as VercelRouteHandler;
+      routes[method] = ((request: Request, context: RouteContext) => handler(request, { params: context.params })) as VercelRouteHandler;
     }
   }
   return routes;
@@ -98,13 +98,18 @@ const routes: Array<{ match: (segments: string[]) => Record<string, string> | nu
   { match: exact('webhook', 'sepay'), routes: adapt(webhookSepay) },
 ];
 
-function resolveRoute(request: { url?: string | null }): VercelRouteMatch | null {
-  const url = String(request.url || '/');
-  let pathname = url.split('?', 1)[0].replace(/\/+$/, '') || '/';
+function routePathFromRequest(request: { url?: string | null }): string {
+  const url = new URL(String(request.url || '/'), 'http://vercel.internal');
+  const forwardedPath = url.searchParams.get('__path');
+  if (forwardedPath) {
+    return forwardedPath.startsWith('/') ? forwardedPath : `/${forwardedPath}`;
+  }
+  return url.pathname;
+}
 
-  // Vercel can expose req.url either with the /api prefix or relative to the
-  // matched function. Accept both forms so the single Hobby catch-all works
-  // consistently across preview/production runtimes.
+function resolveRoute(request: { url?: string | null }): VercelRouteMatch | null {
+  let pathname = routePathFromRequest(request).replace(/\/+$|^$/, '') || '/';
+
   if (pathname === '/api' || pathname.startsWith('/api/')) {
     pathname = pathname.replace(/^\/api\/?/, '/');
   }
