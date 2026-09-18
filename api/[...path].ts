@@ -36,8 +36,9 @@ import * as webhookSepay from '@/server/routes/webhook/sepay';
 
 export const config = { api: { bodyParser: false } };
 
-type RouteModule = Partial<Record<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD',
-  (request: Request, context?: { params: Record<string, string> }) => Promise<Response> | Response>>;
+type RouteContext = { params: Record<string, string> };
+type RouteModuleHandler = (request: Request, context: RouteContext) => Promise<Response> | Response;
+type RouteModule = Partial<Record<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD', RouteModuleHandler>>;
 
 function adapt(module: RouteModule): VercelRouteMap {
   const routes: VercelRouteMap = {};
