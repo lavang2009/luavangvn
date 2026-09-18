@@ -266,14 +266,25 @@ export async function getTransaction(requestId: string) {
   return { id: snap.id, ...(snap.data() as JsonRecord) } as JsonRecord;
 }
 
-export async function checkTransaction(requestId: string) {
+export interface CheckTransactionResult {
+  tx: JsonRecord;
+  provider: JsonRecord;
+  credit: CardCreditResult;
+  endpoint?: string;
+}
+
+export async function checkTransaction(requestId: string): Promise<CheckTransactionResult> {
   const tx = await getTransaction(requestId);
   if (!tx) throw new Error('TRANSACTION_NOT_FOUND');
   if (tx.status === 'credited') {
     return {
       tx,
       provider: { status: 1, value: tx.realValue || tx.declaredAmount },
-      credit: { credited: false, alreadyCredited: true, amount: num(tx.creditedAmount) },
+      credit: {
+        credited: false,
+        alreadyCredited: true,
+        amount: num(tx.creditedAmount),
+      },
     };
   }
 
@@ -292,7 +303,8 @@ export async function checkTransaction(requestId: string) {
   });
   const credit = await creditByDeclaredAmount(requestId, result.data);
   const latest = await getTransaction(requestId);
-  return { tx: latest, provider: result.data, credit, endpoint: result.endpoint };
+  if (!latest) throw new Error('TRANSACTION_NOT_FOUND');
+  return { tx: latest, provider: result.data as JsonRecord, credit, endpoint: result.endpoint };
 }
 
 export async function submitCard(input: {
