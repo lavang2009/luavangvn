@@ -4,6 +4,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { firebaseAuth } from '@/lib/firebase/client';
 import { initAuthPersistence } from '@/lib/firebase/auth-client';
+import { ensureUserProfile } from '@/lib/firebase/user';
 
 interface AuthContextValue {
   user: User | null;
@@ -25,7 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (next) {
         try {
           const token = await next.getIdToken();
-          await fetch('/api/auth/bootstrap', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+          const response = await fetch('/api/auth/bootstrap', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+          if (!response.ok) {
+            await ensureUserProfile({
+              uid: next.uid,
+              email: next.email,
+              displayName: next.displayName,
+              photoURL: next.photoURL,
+              providerId: next.providerData[0]?.providerId ?? 'password',
+            });
+          }
         } catch {
           // Bootstrap is best-effort; authentication state remains valid.
         }

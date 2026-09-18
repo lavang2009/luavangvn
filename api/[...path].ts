@@ -100,10 +100,16 @@ const routes: Array<{ match: (segments: string[]) => Record<string, string> | nu
 
 function resolveRoute(request: { url?: string | null }): VercelRouteMatch | null {
   const url = String(request.url || '/');
-  const pathname = url.split('?', 1)[0].replace(/\/+$/, '') || '/';
-  if (pathname !== '/api' && !pathname.startsWith('/api/')) return null;
+  let pathname = url.split('?', 1)[0].replace(/\/+$/, '') || '/';
 
-  const rawSegments = pathname.replace(/^\/api\/?/, '').split('/').filter(Boolean);
+  // Vercel can expose req.url either with the /api prefix or relative to the
+  // matched function. Accept both forms so the single Hobby catch-all works
+  // consistently across preview/production runtimes.
+  if (pathname === '/api' || pathname.startsWith('/api/')) {
+    pathname = pathname.replace(/^\/api\/?/, '/');
+  }
+
+  const rawSegments = pathname.split('/').filter(Boolean);
   let segments: string[];
   try {
     segments = rawSegments.map((segment) => decodeURIComponent(segment));

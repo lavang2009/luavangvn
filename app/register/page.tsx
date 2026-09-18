@@ -6,6 +6,7 @@ import { Globe2, LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { registerUser, loginWithGoogle, authErrorMessage } from '@/lib/firebase/auth-client';
+import { ensureUserProfile } from '@/lib/firebase/user';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Container } from '@/components/ui/Container';
@@ -36,7 +37,19 @@ export default function RegisterPage() {
       },
       body: JSON.stringify({ username }),
     });
-    if (!response.ok) throw new Error('AUTH_BOOTSTRAP_FAILED');
+    if (!response.ok) {
+      try {
+        await ensureUserProfile({
+          uid: createdUser.uid,
+          email: createdUser.email,
+          displayName: createdUser.displayName,
+          photoURL: createdUser.photoURL,
+          providerId: createdUser.providerData[0]?.providerId ?? 'password',
+        });
+      } catch {
+        // The Firebase Auth account is already created; profile bootstrap will retry on auth state.
+      }
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {

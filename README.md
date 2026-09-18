@@ -73,6 +73,17 @@ Copy `.env.example` to `.env.local` and fill only real values.
 
 For `FIREBASE_PRIVATE_KEY`, preserve line breaks as `\\n` if the platform stores the key in one line.
 
+## Vercel API diagnostics
+
+After deployment, open `/api/health`. A JSON response means the single Hobby catch-all Function is reachable. If `/api/auth/bootstrap` or `/api/auth/me` returns 404, redeploy the latest source containing `api/[...path].ts`; the router accepts both Vercel URL forms (`/api/...` and function-local `/...`). If `/api/products` returns `PRODUCTS_ERROR`, check the Firebase Admin variables below.
+
+Required server configuration:
+- `FIREBASE_PROJECT_ID` (or `NEXT_PUBLIC_FIREBASE_PROJECT_ID`)
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+
+Alternatively set `FIREBASE_SERVICE_ACCOUNT_JSON` to the full service-account JSON in one Vercel secret.
+
 ## Admin setup
 
 Do not register an admin through the UI.

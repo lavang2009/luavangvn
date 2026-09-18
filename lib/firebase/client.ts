@@ -12,6 +12,17 @@ const config = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+function assertFirebaseClientConfig() {
+  const required = Object.entries(config).filter(([, value]) => !value).map(([key]) => key);
+  if (required.length) {
+    const error = new Error(`FIREBASE_CLIENT_CONFIG_MISSING:${required.join(',')}`);
+    (error as Error & { code?: string }).code = 'app/firebase-config-missing';
+    throw error;
+  }
+}
+
+assertFirebaseClientConfig();
+
 export const firebaseApp = getApps().length ? getApp() : initializeApp(config);
 export const firebaseAuth = getAuth(firebaseApp);
 export const firebaseDb = getFirestore(firebaseApp);

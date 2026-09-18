@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import type { Product } from '@/types/shop';
 import { SectionTitle } from '@/components/ui/SectionTitle';
+import { fetchJson } from '@/lib/api';
 
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -27,7 +28,16 @@ export default function ShopPage() {
     setLoading(true);
     const q = new URLSearchParams({ limit: '100' });
     if (category !== 'all') q.set('category', category);
-    fetch(`/api/products?${q.toString()}`).then((r) => r.json()).then((j) => j.ok && setProducts(j.data.items)).finally(() => setLoading(false));
+    fetchJson<{ ok: boolean; data?: { items: Product[] }; error?: { message?: string } }>(`/api/products?${q.toString()}`)
+      .then(({ response, body }) => {
+        if (response.ok && body?.ok) {
+          setProducts(body.data?.items ?? []);
+          return;
+        }
+        setProducts([]);
+      })
+      .catch(() => setProducts([]))
+      .finally(() => setLoading(false));
   }, [category]);
 
   useEffect(() => setPage(1), [search, category, sort]);
