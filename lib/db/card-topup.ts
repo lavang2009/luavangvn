@@ -26,7 +26,18 @@ function fingerprint(serial: string, code: string) {
   return crypto.createHmac('sha256', Buffer.from(secret, 'hex')).update(`${serial}|${code}`, 'utf8').digest('hex');
 }
 
-export function summary(row: Record<string, any>) {
+type JsonRecord = Record<string, unknown>;
+
+export interface CardCreditResult {
+  credited: boolean;
+  alreadyCredited: boolean;
+  amount: number;
+  newBalance?: number;
+  wrongValue?: boolean;
+  actualValue?: number;
+}
+
+export function summary(row: JsonRecord) {
   return {
     requestId: row.requestId,
     telco: clean(row.telco),
@@ -98,8 +109,8 @@ export async function createTransaction(input: {
 
 export async function saveProviderState(
   requestId: string,
-  data: Record<string, any>,
-  extra: Record<string, any> = {},
+  data: JsonRecord,
+  extra: JsonRecord = {},
 ) {
   const db = getAdminDb();
   const ref = db.collection('cardTransactions').doc(requestId);
@@ -107,7 +118,7 @@ export async function saveProviderState(
   const current = await ref.get();
   if (!current.exists) throw new Error('TRANSACTION_NOT_FOUND');
 
-  const patch: Record<string, any> = {
+  const patch: JsonRecord = {
     providerStatus: status,
     statusLabel: statusLabel(status),
     providerMessage: clean(data.message),
@@ -146,7 +157,7 @@ export async function markUnknown(requestId: string, message: string) {
   );
 }
 
-export async function creditByDeclaredAmount(requestId: string, providerData: Record<string, any>) {
+export async function creditByDeclaredAmount(requestId: string, providerData: JsonRecord): Promise<CardCreditResult> {
   const providerStatus = num(providerData.status);
   if (providerStatus !== 1) return { credited: false, alreadyCredited: false, amount: 0 };
 
@@ -252,7 +263,7 @@ export async function creditByDeclaredAmount(requestId: string, providerData: Re
 export async function getTransaction(requestId: string) {
   const snap = await getAdminDb().collection('cardTransactions').doc(requestId).get();
   if (!snap.exists) return null;
-  return { id: snap.id, ...snap.data() } as Record<string, any>;
+  return { id: snap.id, ...(snap.data() as JsonRecord) } as JsonRecord;
 }
 
 export async function checkTransaction(requestId: string) {

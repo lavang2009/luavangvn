@@ -15,7 +15,7 @@ function normalizePaymentCode(value: unknown) {
   return /^NAP[A-Z0-9]{6,}$/.test(code) ? code : '';
 }
 
-function extractPaymentCode(payload: Record<string, any>) {
+function extractPaymentCode(payload: Record<string, unknown>) {
   const fromCode = normalizePaymentCode(payload.code);
   if (fromCode) return fromCode;
 
@@ -88,7 +88,7 @@ export async function createSePayDepositPayload(amount: number, paymentCode: str
   };
 }
 
-export async function processSePayPayload(payload: Record<string, any>) {
+export async function processSePayPayload(payload: Record<string, unknown>) {
   const transferType = clean(payload.transferType).toLowerCase();
   if (transferType !== 'in') return { success: true, ignored: true, reason: 'not_incoming' };
 
@@ -129,7 +129,7 @@ export async function processSePayPayload(payload: Record<string, any>) {
   }
 
   const depositRef = depositSnap.docs[0].ref;
-  const deposit = depositSnap.docs[0].data();
+  const deposit = depositSnap.docs[0].data() as Record<string, unknown>;
   const depositId = depositSnap.docs[0].id;
 
   const amount = Number(payload.transferAmount || 0);

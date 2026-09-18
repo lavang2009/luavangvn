@@ -5,6 +5,11 @@ import { createPaymentCode, createSePayDepositPayload } from '@/services/payment
 import { fail, ok } from '@/lib/api';
 import { rateLimit } from '@/lib/security/rate-limit';
 
+type DepositHistoryItem = Record<string, unknown> & {
+  createdAt?: number | string | null;
+  updatedAt?: number | string | null;
+};
+
 export async function POST(request: Request) {
   try {
     const auth = await requireAuth(request);
@@ -50,13 +55,16 @@ export async function GET(request: Request) {
       db.collection('cardTransactions').where('uid', '==', auth.uid).limit(50).get(),
     ]);
 
-    const bankItems = depositSnapshot.docs.map((d) => ({
-      ...d.data(),
-      method: d.data().method ?? 'sepay',
-      provider: d.data().provider ?? 'sepay',
-    }));
+    const bankItems: DepositHistoryItem[] = depositSnapshot.docs.map((d) => {
+      const data = d.data() as Record<string, unknown>;
+      return {
+        ...data,
+        method: data.method ?? 'sepay',
+        provider: data.provider ?? 'sepay',
+      };
+    });
 
-    const cardItems = cardSnapshot.docs.map((d) => {
+    const cardItems: DepositHistoryItem[] = cardSnapshot.docs.map((d) => {
       const data = d.data();
       const success = data.status === 'credited';
       return {

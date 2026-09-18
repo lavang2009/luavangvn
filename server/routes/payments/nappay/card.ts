@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       serial,
     });
 
-    const provider = result.provider as Record<string, any>;
+    const provider = result.provider as Record<string, unknown>;
     const wrongValue = Boolean(result.credit?.wrongValue || Number(provider.value || provider.declared_value || 0) !== 0 && Number(provider.status) === 2);
 
     return ok({

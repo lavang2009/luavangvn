@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return fail('Không tìm thấy giao dịch.', 404, 'TRANSACTION_NOT_FOUND');
     }
 
-    const provider = (result.provider ?? {}) as Record<string, any>;
+    const provider = (result.provider ?? {}) as Record<string, unknown>;
     return ok({
       transaction: summary(result.tx),
       requestId,

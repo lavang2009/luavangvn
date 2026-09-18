@@ -4,7 +4,7 @@ async function readRawBody(request: Request) {
   return await request.text();
 }
 
-function parsePayload(raw: string, request: Request): Record<string, any> {
+function parsePayload(raw: string, request: Request): Record<string, unknown> {
   const contentType = String(request.headers.get('content-type') ?? '').toLowerCase();
   if (contentType.includes('application/json')) {
     return JSON.parse(raw || '{}');

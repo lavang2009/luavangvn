@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       return fail(verified.message ?? 'Webhook không hợp lệ.', verified.status ?? 401, 'SEPAY_WEBHOOK_REJECTED');
     }
 
-    let payload: Record<string, any>;
+    let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(rawBody || '{}');
     } catch {
