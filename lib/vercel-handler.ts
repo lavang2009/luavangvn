@@ -2,7 +2,10 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:
 
 export type VercelRouteContext = { params: Record<string, string> };
 export type VercelRouteHandler = (request: Request, context: VercelRouteContext) => Promise<Response> | Response;
-type RouteMap = Partial<Record<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD', VercelRouteHandler>>;
+export type VercelMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
+export type VercelRouteMap = Partial<Record<VercelMethod, VercelRouteHandler>>;
+export type VercelRouteMatch = { routes: VercelRouteMap; params: Record<string, string> };
+
 type ParamsResolver = (request: IncomingMessage) => Record<string, string>;
 
 type VercelRequest = IncomingMessage & {
@@ -67,10 +70,16 @@ function sendMethodNotAllowed(target: ServerResponse, allowed: string[]) {
   target.end(JSON.stringify({ ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }));
 }
 
-export function createVercelHandler(routes: RouteMap, resolveParams?: ParamsResolver) {
+function sendNotFound(target: ServerResponse) {
+  target.statusCode = 404;
+  target.setHeader('content-type', 'application/json; charset=utf-8');
+  target.end(JSON.stringify({ ok: false, error: { code: 'NOT_FOUND', message: 'API route not found.' } }));
+}
+
+export function createVercelHandler(routes: VercelRouteMap, resolveParams?: ParamsResolver) {
   return async function handler(request: VercelRequest, response: ServerResponse) {
     try {
-      const method = (request.method || 'GET').toUpperCase() as keyof RouteMap;
+      const method = (request.method || 'GET').toUpperCase() as VercelMethod;
       const route = routes[method];
       if (!route) {
         sendMethodNotAllowed(response, Object.keys(routes));
@@ -83,6 +92,34 @@ export function createVercelHandler(routes: RouteMap, resolveParams?: ParamsReso
       await sendResponse(result, response);
     } catch (error) {
       console.error('[vercel-api]', error);
+      response.statusCode = 500;
+      response.setHeader('content-type', 'application/json; charset=utf-8');
+      response.end(JSON.stringify({ ok: false, error: { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error.' } }));
+    }
+  };
+}
+
+export function createVercelRouterHandler(resolveRoute: (request: IncomingMessage) => VercelRouteMatch | null) {
+  return async function handler(request: VercelRequest, response: ServerResponse) {
+    try {
+      const match = resolveRoute(request);
+      if (!match) {
+        sendNotFound(response);
+        return;
+      }
+
+      const method = (request.method || 'GET').toUpperCase() as VercelMethod;
+      const route = match.routes[method];
+      if (!route) {
+        sendMethodNotAllowed(response, Object.keys(match.routes));
+        return;
+      }
+
+      const webRequest = await toWebRequest(request);
+      const result = await route(webRequest, { params: match.params });
+      await sendResponse(result, response);
+    } catch (error) {
+      console.error('[vercel-api-router]', error);
       response.statusCode = 500;
       response.setHeader('content-type', 'application/json; charset=utf-8');
       response.end(JSON.stringify({ ok: false, error: { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error.' } }));
