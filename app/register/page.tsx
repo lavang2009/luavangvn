@@ -2,7 +2,7 @@
 
 import type { FormEvent } from 'react';
 import Link from 'next/link';
-import { Chrome, LockKeyhole, Mail, UserRound } from 'lucide-react';
+import { Globe2, LockKeyhole, Mail, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { registerUser, loginWithGoogle, authErrorMessage } from '@/lib/firebase/auth-client';
@@ -113,7 +113,7 @@ export default function RegisterPage() {
           <Button type="submit" loading={loading} className="w-full">Tạo tài khoản</Button>
         </form>
         <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[.2em] text-white/25"><span className="h-px flex-1 bg-white/10" />hoặc<span className="h-px flex-1 bg-white/10" /></div>
-        <Button type="button" variant="secondary" onClick={google} loading={loading} className="w-full"><Chrome className="h-4 w-4" />Tiếp tục với Google</Button>
+        <Button type="button" variant="secondary" onClick={google} loading={loading} className="w-full"><Globe2 className="h-4 w-4" />Tiếp tục với Google</Button>
         <p className="mt-6 text-center text-sm text-white/40">Đã có tài khoản? <Link className="font-bold text-cyan-300" href="/login">Đăng nhập</Link></p>
       </div>
     </Container>
