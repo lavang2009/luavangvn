@@ -1,0 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import { requireAdmin } from '@/lib/security/auth';
+import { getAdminStorage, getAdminDb } from '@/lib/firebase/admin';
+import { adminError } from '@/lib/security/admin-response';
+import { fail, ok } from '@/lib/api';
+
+export async function POST(request:Request){try{const auth=await requireAdmin(request);const form=await request.formData();const file=form.get('file');if(!(file instanceof File))return fail('Thiếu file upload.');if(file.size>100*1024*1024)return fail('File vượt giới hạn 100MB.');const productId=String(form.get('productId')??'');if(!productId)return fail('Thiếu productId.');const product=await getAdminDb().collection('products').doc(productId).get();if(!product.exists||product.data()?.category!=='file')return fail('File asset chỉ gán cho product FILE.');const filename=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');const path=`private/products/${productId}/${randomUUID()}-${filename}`;const buffer=Buffer.from(await file.arrayBuffer());const storageFile=getAdminStorage().bucket().file(path);await storageFile.save(buffer,{resumable:false,metadata:{contentType:file.type||'application/octet-stream',metadata:{uploadedBy:auth.uid}}});return ok({storagePath:path,fileName:file.name,sizeBytes:file.size});}catch(e){return adminError(e)}}
+export async function DELETE(request:Request){try{await requireAdmin(request);const {searchParams}=new URL(request.url);const path=searchParams.get('storagePath');if(!path||!path.startsWith('private/products/'))return fail('Storage path không hợp lệ.');await getAdminStorage().bucket().file(path).delete({ignoreNotFound:true});return ok({deleted:true});}catch(e){return adminError(e)}}
