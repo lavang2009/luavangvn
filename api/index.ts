@@ -1,4 +1,4 @@
-import { createVercelRouterHandler, type VercelRouteHandler, type VercelRouteMap, type VercelRouteMatch } from '@/lib/vercel-handler';
+import { createVercelRouterHandler, resolveApiPath, type VercelRouteHandler, type VercelRouteMap, type VercelRouteMatch } from '@/lib/vercel-handler';
 
 import * as adminDeposits from '@/server/routes/admin/deposits';
 import * as adminFiles from '@/server/routes/admin/files';
@@ -45,7 +45,7 @@ function adapt(module: RouteModule): VercelRouteMap {
   for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'] as const) {
     const handler = module[method];
     if (handler) {
-      routes[method] = ((request: Request, context: RouteContext) => handler(request, { params: context.params })) as VercelRouteHandler;
+      routes[method] = ((request: Request, context) => handler(request, { params: context.params })) as VercelRouteHandler;
     }
   }
   return routes;
@@ -98,18 +98,12 @@ const routes: Array<{ match: (segments: string[]) => Record<string, string> | nu
   { match: exact('webhook', 'sepay'), routes: adapt(webhookSepay) },
 ];
 
-function routePathFromRequest(request: { url?: string | null }): string {
-  const url = new URL(String(request.url || '/'), 'http://vercel.internal');
-  const forwardedPath = url.searchParams.get('__path');
-  if (forwardedPath) {
-    return forwardedPath.startsWith('/') ? forwardedPath : `/${forwardedPath}`;
-  }
-  return url.pathname;
-}
-
 function resolveRoute(request: { url?: string | null }): VercelRouteMatch | null {
-  let pathname = routePathFromRequest(request).replace(/\/+$|^$/, '') || '/';
+  let pathname = resolveApiPath(request).replace(/\/+$/, '') || '/';
 
+  // Vercel can expose req.url either with the /api prefix or relative to the
+  // matched function. Accept both forms so the single Hobby catch-all works
+  // consistently across preview/production runtimes.
   if (pathname === '/api' || pathname.startsWith('/api/')) {
     pathname = pathname.replace(/^\/api\/?/, '/');
   }

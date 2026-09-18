@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       if (next) {
         try {
-          const token = await next.getIdToken();
+          const token = await next.getIdToken(true);
           const response = await fetch('/api/auth/bootstrap', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
           if (!response.ok) {
             await ensureUserProfile({

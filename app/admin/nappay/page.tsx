@@ -1,0 +1,14 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { formatDate, formatVnd } from '@/lib/utils';
+
+type Row = { requestId: string; uid: string; username?: string; telco?: string; declaredAmount: number; realValue: number; creditedAmount: number; status: string; statusLabel?: string; providerStatus?: number; providerMessage?: string; transId?: string | null; createdAt?: string | number | null; codeMasked?: string; serialMasked?: string; };
+
+export default function AdminNappayPage(){
+  const [rows,setRows]=useState<Row[]>([]);
+  const [stats,setStats]=useState<{total:number;credited:number;pending:number;creditedAmount:number}>({total:0,credited:0,pending:0,creditedAmount:0});
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{let cancelled=false; (async()=>{try{const {firebaseAuth}=await import('@/lib/firebase/client');const t=await firebaseAuth.currentUser?.getIdToken(true);if(!t)return;const r=await fetch('/api/admin/nappay/card',{headers:{Authorization:`Bearer ${t}`}});const j=await r.json();if(!cancelled&&j.ok){setRows(j.data.rows??[]);setStats(j.data.stats??stats)}}finally{if(!cancelled)setLoading(false)}})();return()=>{cancelled=true}},[]);
+  return <div><div className="mb-6"><div className="text-xs font-black uppercase tracking-[.24em] text-cyan-300/70">Payment provider</div><h1 className="mt-2 text-3xl font-black">NAPPay</h1><p className="mt-1 text-sm text-white/35">Giao dịch thẻ, trạng thái provider và tiền đã cộng ví.</p></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Tổng',stats.total],['Đã cộng',stats.credited],['Đang xử lý',stats.pending],['Đã cộng ví',formatVnd(stats.creditedAmount)]].map(([k,v])=><div key={String(k)} className="lv-glass rounded-2xl p-4"><div className="text-[10px] font-black uppercase tracking-[.18em] text-white/30">{k}</div><div className="mt-2 text-xl font-black">{v}</div></div>)}</div><div className="mt-5 overflow-x-auto lv-glass rounded-2xl"><table className="min-w-[950px] w-full text-sm"><thead><tr className="border-b border-white/10 text-left text-white/35"><th className="p-4">Request</th><th>Username</th><th>Telco</th><th>Khai báo</th><th>Thực tế</th><th>Đã cộng</th><th>Status</th><th>Provider</th><th>Thời gian</th></tr></thead><tbody>{loading?<tr><td colSpan={9} className="p-6 text-center text-white/35">Đang tải…</td></tr>:rows.map(r=><tr key={r.requestId} className="border-b border-white/5"><td className="p-4 font-mono text-xs">{r.requestId}</td><td>{r.username||r.uid}</td><td>{r.telco}</td><td>{formatVnd(r.declaredAmount)}</td><td>{formatVnd(r.realValue)}</td><td>{formatVnd(r.creditedAmount)}</td><td>{r.statusLabel||r.status}</td><td>{r.providerStatus ?? '—'} {r.transId?`• ${r.transId}`:''}</td><td>{formatDate(Number(r.createdAt ?? 0))}</td></tr>)}</tbody></table></div></div>
+}

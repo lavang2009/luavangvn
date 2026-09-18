@@ -44,6 +44,9 @@ Server environment:
 
 ```text
 SEPAY_WEBHOOK_SECRET=
+SEPAY_API_KEY=
+SEPAY_ALLOW_UNSIGNED_WEBHOOK=false
+SEPAY_QR_TEMPLATE=compact2
 BANK_ACCOUNT=
 BANK_CODE=MB
 BANK_NAME=MBBank
@@ -65,3 +68,7 @@ https://YOUR_DOMAIN/api/nappay/callback
 ```
 
 Then test `/api/health` before submitting real payment data.
+
+## Admin authorization
+
+Server accepts Firebase custom claim `admin=true` and optional `ADMIN_UIDS` / `ADMIN_EMAILS` allowlists. If you set the Firestore user document role to `admin`, the server can also recognize it for compatibility.

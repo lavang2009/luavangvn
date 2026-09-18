@@ -1,1 +1,14 @@
-API runtime routing fix: root api/index.ts + vercel.json rewrite /api/:path* -> /api/index?__path=:path*
+TS/TSX files: 143
+Syntax/transpile errors: 0
+Vercel API functions: 33
+app/api files: 0
+Server route files: 33
+explicit any patterns:
+ts-ignore/eslint-disable:
+localhost refs:
+fileStoragePath refs:
+local import checker: 0 missing
+unused-local diagnostics: 0
+client directive order problems: 0
+mjs syntax: OK
+package.json: OK

@@ -132,3 +132,11 @@ export function lastPathParam(request: IncomingMessage) {
   const segments = rawPath.split('/').filter(Boolean);
   return decodeURIComponent(segments.at(-1) ?? '');
 }
+
+export function resolveApiPath(request: IncomingMessage) {
+  const rawUrl = String(request.url || '/');
+  const parsed = new URL(rawUrl, 'http://vercel.internal');
+  const rewritten = parsed.searchParams.get('__path');
+  if (rewritten) return '/' + rewritten.replace(/^\/+/, '');
+  return parsed.pathname;
+}

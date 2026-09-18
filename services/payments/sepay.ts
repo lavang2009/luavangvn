@@ -29,41 +29,46 @@ export function createPaymentCode() {
 }
 
 export function isSePayConfigured() {
-  return Boolean(clean(process.env.SEPAY_WEBHOOK_SECRET) && clean(process.env.BANK_ACCOUNT));
+  return Boolean(clean(process.env.BANK_ACCOUNT) && (clean(process.env.SEPAY_WEBHOOK_SECRET) || clean(process.env.SEPAY_API_KEY)));
 }
 
 export function verifySePaySignature(rawBody: string, headers: Headers) {
   const secret = clean(process.env.SEPAY_WEBHOOK_SECRET);
-  if (!secret) return { ok: false, status: 500, message: 'SEPAY_WEBHOOK_SECRET chưa được cấu hình.' };
+  const apiKey = clean(process.env.SEPAY_API_KEY);
+
+  const secretHeader = clean(headers.get('x-secret-key'));
+  if (secret && secretHeader && secretHeader === secret) return { ok: true, status: 200 };
+
+  const authorization = clean(headers.get('authorization'));
+  if (apiKey && authorization.startsWith('Apikey ') && authorization.slice(7).trim() === apiKey) {
+    return { ok: true, status: 200 };
+  }
 
   const signature = clean(headers.get('x-sepay-signature'));
   const timestamp = clean(headers.get('x-sepay-timestamp'));
-  if (!signature || !timestamp) return { ok: false, status: 401, message: 'Thiếu chữ ký webhook.' };
-
-  const ts = Number(timestamp);
-  if (!Number.isFinite(ts)) return { ok: false, status: 401, message: 'Timestamp webhook không hợp lệ.' };
-
-  const age = Math.abs(Date.now() - ts * 1000);
-  if (age > 5 * 60 * 1000) return { ok: false, status: 401, message: 'Webhook đã quá thời gian cho phép.' };
-
-  const expected =
-    'sha256=' +
-    crypto.createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
-
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return { ok: false, status: 401, message: 'Chữ ký webhook không hợp lệ.' };
+  if (secret && signature && timestamp) {
+    const ts = Number(timestamp);
+    if (Number.isFinite(ts)) {
+      const age = Math.abs(Date.now() - ts * 1000);
+      if (age <= 5 * 60 * 1000) {
+        const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
+        const a = Buffer.from(signature);
+        const b = Buffer.from(expected);
+        if (a.length === b.length && crypto.timingSafeEqual(a, b)) return { ok: true, status: 200 };
+      }
+    }
   }
 
-  return { ok: true, status: 200 };
+  if (process.env.SEPAY_ALLOW_UNSIGNED_WEBHOOK === 'true') return { ok: true, status: 200 };
+  return { ok: false, status: 401, message: 'Webhook SePay chưa vượt qua xác thực.' };
 }
 
 export async function createSePayDepositPayload(amount: number, paymentCode: string) {
   const account = clean(process.env.BANK_ACCOUNT);
-  const bank = clean(process.env.BANK_CODE || 'MB');
+  const bank = clean(process.env.BANK_CODE || 'MB').replace(/[^a-zA-Z0-9]/g, '');
   const accountName = clean(process.env.BANK_ACCOUNT_NAME);
   const bankName = clean(process.env.BANK_NAME || bank);
+  const template = clean(process.env.SEPAY_QR_TEMPLATE || 'compact2') || 'compact2';
 
   if (!account || !bank) {
     return {
@@ -73,29 +78,30 @@ export async function createSePayDepositPayload(amount: number, paymentCode: str
     };
   }
 
-  const qrParams = new URLSearchParams({
-    acc: account,
-    bank,
-    amount: String(amount),
-    des: paymentCode,
-  });
-  const qrImageUrl = `https://vietqr.app/img?${qrParams.toString()}`;
+  // VietQR Quick Link: documented image URL with amount, transfer content and account name.
+  const qrUrl = new URL(`https://img.vietqr.io/image/${encodeURIComponent(bank)}-${encodeURIComponent(account)}-${encodeURIComponent(template)}.jpg`);
+  qrUrl.searchParams.set('amount', String(amount));
+  qrUrl.searchParams.set('addInfo', paymentCode);
+  if (accountName) qrUrl.searchParams.set('accountName', accountName);
 
   return {
     configured: true,
-    qrDataUrl: qrImageUrl,
+    qrDataUrl: qrUrl.toString(),
     bankInfo: { bank: bankName, account, accountName, paymentCode },
   };
 }
 
 export async function processSePayPayload(payload: Record<string, unknown>) {
-  const transferType = clean(payload.transferType).toLowerCase();
+  const eventData = payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+    ? payload.data as Record<string, unknown>
+    : payload;
+  const transferType = clean(eventData.transferType).toLowerCase();
   if (transferType !== 'in') return { success: true, ignored: true, reason: 'not_incoming' };
 
-  const externalId = clean(payload.id || payload.referenceCode);
+  const externalId = clean(eventData.id || eventData.referenceCode);
   if (!externalId) return { success: false, status: 400, message: 'Missing transaction id' };
 
-  const paymentCode = extractPaymentCode(payload);
+  const paymentCode = extractPaymentCode(eventData);
   if (!paymentCode) {
     return {
       success: false,
@@ -132,7 +138,7 @@ export async function processSePayPayload(payload: Record<string, unknown>) {
   const deposit = depositSnap.docs[0].data() as Record<string, unknown>;
   const depositId = depositSnap.docs[0].id;
 
-  const amount = Number(payload.transferAmount || 0);
+  const amount = Number(eventData.transferAmount || 0);
   const expectedAmount = Number(deposit.amount ?? deposit.requestedAmount ?? 0);
 
   if (amount !== expectedAmount) {
@@ -148,7 +154,7 @@ export async function processSePayPayload(payload: Record<string, unknown>) {
   }
 
   const expectedAccount = clean(process.env.BANK_ACCOUNT);
-  const receivedAccount = clean(payload.accountNumber);
+  const receivedAccount = clean(eventData.accountNumber);
   if (expectedAccount && receivedAccount && expectedAccount !== receivedAccount) {
     return {
       success: false,
@@ -205,10 +211,10 @@ export async function processSePayPayload(payload: Record<string, unknown>) {
         paidAt: now,
         processedAt: now,
         transactionId: externalId,
-        referenceCode: payload.referenceCode || null,
-        gateway: payload.gateway || null,
-        accountNumber: payload.accountNumber || null,
-        sepayId: payload.id ?? null,
+        referenceCode: eventData.referenceCode || null,
+        gateway: eventData.gateway || null,
+        accountNumber: eventData.accountNumber || null,
+        sepayId: eventData.id ?? null,
         updatedAt: Date.now(),
       },
       { merge: true },
@@ -236,9 +242,9 @@ export async function processSePayPayload(payload: Record<string, unknown>) {
         totalTopupAfter: oldTotalTopup + amount,
         status: 'completed',
         paymentCode,
-        referenceCode: payload.referenceCode || null,
-        gateway: payload.gateway || null,
-        accountNumber: payload.accountNumber || null,
+        referenceCode: eventData.referenceCode || null,
+        gateway: eventData.gateway || null,
+        accountNumber: eventData.accountNumber || null,
         createdAt: Date.now(),
       },
       { merge: true },
